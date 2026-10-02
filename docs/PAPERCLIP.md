@@ -7,13 +7,10 @@ Este guia registra apenas o que foi testado e funcionou.
 ## Onde paramos
 
 - Paperclip configurado e validado: a tarefa **CEL-2** rodou em worktree isolada a partir de `develop` (seção 5).
-- A tarefa **CEL-3 — recuperação de senha** (seção 6) foi executada pelo agente, que abriu o **PR #1**. A revisão encontrou problemas e o PR ainda não pode ser aprovado (seção 6, _Revisão do PR #1_).
+- A tarefa **CEL-3 — recuperação de senha** (seção 6) foi executada pelo agente, que abriu o **PR #1**. A revisão encontrou problemas (seção 6, _Revisão do PR #1_); as lições foram incorporadas às instruções dos agentes do tutorial.
 - A CI (seção 7) foi criada em `.github/workflows/ci.yml`, mas ainda não está na `develop`.
-- **Próximos passos:**
-  1. Abrir um PR só com a CI (branch `ci/github-actions` → `develop`), conferir que ela fica verde e fazer o merge.
-  2. Proteger a `develop` exigindo o check da CI (seção 7).
-  3. Comentar na CEL-3 a revisão do PR #1 para o agente corrigir na mesma branch.
-  4. Com a CI verde no PR #1 e o diff revisado, fazer o merge em `develop`.
+- **Decisão:** a recuperação de senha será refeita do zero para o tutorial, a partir de `develop` em `b0158f4`, com o fluxo Analista → Backend Developer → Responsável → homologação.
+- **Próximo passo:** seguir a preparação em [PAPERCLIP-TUTORIAL.md](PAPERCLIP-TUTORIAL.md) (fechar o PR #1, convidar pessoas, criar e ajustar os agentes, decidir sobre a CI).
 
 ### Contexto para continuar com o Claude Code em outro computador
 
