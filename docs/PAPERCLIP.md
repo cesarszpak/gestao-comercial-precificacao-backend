@@ -7,7 +7,13 @@ Este guia registra apenas o que foi testado e funcionou.
 ## Onde paramos
 
 - Paperclip configurado e validado: a tarefa **CEL-2** rodou em worktree isolada a partir de `develop` (seção 5).
-- **Próximo passo:** criar a tarefa **CEL-3 — recuperação de senha** (seção 6) e revisar o Pull Request que o agente abrir.
+- A tarefa **CEL-3 — recuperação de senha** (seção 6) foi executada pelo agente, que abriu o **PR #1**. A revisão encontrou problemas e o PR ainda não pode ser aprovado (seção 6, _Revisão do PR #1_).
+- A CI (seção 7) foi criada em `.github/workflows/ci.yml`, mas ainda não está na `develop`.
+- **Próximos passos:**
+  1. Abrir um PR só com a CI (branch `ci/github-actions` → `develop`), conferir que ela fica verde e fazer o merge.
+  2. Proteger a `develop` exigindo o check da CI (seção 7).
+  3. Comentar na CEL-3 a revisão do PR #1 para o agente corrigir na mesma branch.
+  4. Com a CI verde no PR #1 e o diff revisado, fazer o merge em `develop`.
 
 ### Contexto para continuar com o Claude Code em outro computador
 
@@ -35,7 +41,7 @@ Para cada tarefa: git worktree própria + branch <ID>-<slug> a partir de origin/
 Agente (Codex) trabalha na worktree
    │
    ▼
-Pull Request ──► develop ──► homolog ──► main
+Pull Request ──► CI (GitHub Actions) ──► revisão humana ──► develop ──► homolog ──► main
 ```
 
 | Branch    | Ambiente | Uso                                             |
@@ -51,6 +57,7 @@ Os agentes nunca alteram `develop`, `homolog` ou `main` diretamente.
 - Repositório no GitHub: `celkecursos/gestao-comercial-precificacao-backend`, com as branches `main`, `homolog` e `develop`.
 - No Paperclip, o GitHub conectado e o app **Paperclip for GitHub** com acesso ao repositório.
 - Uma chave `OPENAI_API_KEY` para o agente Codex.
+- A CI do repositório (seção 7). O Paperclip roda na VPS, e o ambiente do agente não tem MySQL: o agente não consegue rodar `test:e2e` nem conferir migrations, e quem faz essa verificação é a CI.
 
 ## 1. Habilitar workspaces isolados na instância
 
@@ -141,7 +148,7 @@ Em **Edit configuration**, defina o _Title_ `Backend Developer — Gestão Comer
 
 ### Instruções do agente
 
-Em **Instructions → AGENTS.md**, mantenha o contrato padrão do Paperclip que já vem no arquivo e acrescente ao final:
+Em **Agents → Backend Developer → Instructions → AGENTS.md** (botão **edit**; **raw** mostra o texto salvo), mantenha o contrato padrão do Paperclip que já vem no arquivo e acrescente ao final o bloco abaixo, uma única vez. Para mudar as instruções depois, edite o mesmo bloco nessa tela: o AGENTS.md do repositório não atualiza o do Paperclip.
 
 ```markdown
 ## Project: Gestão Comercial e Precificação — Backend
@@ -181,9 +188,14 @@ npm run lint, npm run test, npm run test:e2e e npm run build passando.
 Se algum comando não puder rodar no ambiente (ex.: sem MySQL para o e2e), diga isso
 explicitamente. Nunca afirme que passou sem ter executado.
 
+O repositório tem CI (GitHub Actions) que roda todos esses comandos com MySQL em cada PR.
+Depois de abrir ou atualizar o PR, acompanhe com `gh pr checks <número> --watch`.
+CI vermelha: leia `gh run view <id> --log-failed`, corrija na mesma branch e envie de novo.
+Só marque a tarefa como concluída com a CI verde.
+
 ### Relatório final (comentário na tarefa)
 
-Branch, arquivos alterados, comandos executados com resultado, link do PR e limitações.
+Branch, arquivos alterados, comandos executados com resultado, status da CI, link do PR e limitações.
 ```
 
 ## 4. Como criar tarefas
@@ -236,9 +248,11 @@ Resultado obtido (`/api/issues/CEL-2`):
 | `currentExecutionWorkspace.cwd`          | `<pasta gerenciada do projeto>/.paperclip/worktrees/CEL-2-verificar-workspace-do-backend-read-only` |
 | `deliveryState`                          | `merged_by_ancestry` — esperado: sem commits, a branch é igual à `develop`                          |
 
-## 6. Próxima tarefa — CEL-3: recuperação de senha
+## 6. Tarefa CEL-3 — recuperação de senha (em revisão)
 
-Branch esperada: `CEL-3-implementar-recuperacao-de-senha-por-e-mail-api`, criada pelo Paperclip a partir de `origin/develop`.
+Branch: `CEL-3-implementar-recupera-o-de-senha-por-e-mail-api`, criada pelo Paperclip a partir de `origin/develop`. O Paperclip descarta as letras acentuadas ao gerar o nome (`recuperação` → `recupera-o`).
+
+O editor de tarefas do Paperclip converte a descrição para Markdown e escapa alguns caracteres (`PASSWORD\_RESET...`, `&#x20;`). Confira no PR se os nomes de variáveis saíram corretos.
 
 **Título:** `Implementar recuperação de senha por e-mail (API)`
 
@@ -278,13 +292,58 @@ Definição de pronto: lint, test, test:e2e, build e o migration:generate --dryr
 No PR e no relatório, liste: endpoints, variáveis novas, migration criada e resultado de cada comando.
 ```
 
+### Revisão do PR #1
+
+O agente entregou lint, testes unitários e build passando, mas não rodou `test:e2e` nem a conferência de migrations (sem MySQL no ambiente). Rodando com MySQL:
+
+| Verificação                   | Resultado                                                                    |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| `test:e2e`                    | Falha em `GET /dashboard`: o teste de recuperação cria um usuário (5, não 4) |
+| `migration:generate --dryrun` | Pendência: nome da FK escrito à mão difere do gerado pelo TypeORM            |
+
+Comentário para a tarefa CEL-3:
+
+```text
+Não aprovado ainda. Rodei test:e2e e migration:generate --dryrun com MySQL:
+
+1. test:e2e falha em "GET /dashboard retorna os quatro cards": o usuário criado no teste de
+   recuperação faz users ser 5, não 4. Ajuste a expectativa/comentário.
+2. migration:generate --dryrun aponta pendência: recriar a FK com nome gerado. Adicione
+   foreignKeyConstraintName: 'FK_password_reset_tokens_user_id' no @JoinColumn da entidade.
+3. resetPassword: torne o uso do token atômico — update condicional (usedAt IS NULL) e só chame
+   updatePassword se affected === 1.
+4. Rate limit: remova do Map as chaves sem tentativas na janela (o Map hoje cresce sem limite).
+5. forgotPassword: não deixe falha de SMTP virar 500 (revela e-mail cadastrado); registre no log.
+6. Restaure os comentários e linhas em branco removidos do AuthService (fora do escopo).
+
+Atualize o PR #1 na mesma branch. Não consigo rodar e2e no seu ambiente; eu reexecuto aqui.
+```
+
+Com a CI ativa, a última linha pode ser trocada por: _"Atualize o PR #1 na mesma branch e acompanhe a CI até ficar verde."_
+
 ### Depois do Pull Request
 
-1. Revisar o PR no GitHub e fazer o merge em `develop` → deploy automático do ambiente Develop.
+1. Conferir a CI verde e revisar o diff no PR; fazer o merge em `develop` → deploy automático do ambiente Develop.
 2. PR `develop → homolog` → testes humanos no ambiente Homolog.
 3. PR `homolog → main` → produção.
 4. Cadastrar na Hostinger, em cada ambiente, as novas variáveis (SMTP e URL de redefinição de senha).
 5. Criar o agente **Frontend Developer** no projeto do frontend, seguindo este mesmo guia, para as telas de recuperação de senha.
+
+## 7. CI — GitHub Actions
+
+Arquivo: `.github/workflows/ci.yml`. Roda em todo Pull Request para `develop`, `homolog` e `main` e a cada push nessas branches, com um serviço MySQL 8.4:
+
+`npm ci` → `lint` → `test` → `build` → `migration:run` → `migration:generate --check` → `test:e2e`
+
+O `--check` falha quando as entidades divergem das migrations (o `--dryrun` só mostra a diferença e termina com sucesso). As variáveis ficam no próprio workflow; não há `.env` nem segredos na CI.
+
+Com a CI, a verificação não depende da máquina de ninguém: o agente acompanha o resultado pelo `gh` e o revisor vê o status no PR.
+
+### Exigir a CI antes do merge
+
+No GitHub: **Settings → Branches** (ou **Rules**) → regra para `develop` → **Require status checks to pass** → marcar **Lint, testes, build e migrations**. Repetir para `homolog` e `main`.
+
+O check só aparece na lista depois de rodar pelo menos uma vez.
 
 ## Problemas encontrados e soluções
 
@@ -294,4 +353,5 @@ No PR e no relatório, liste: endpoints, variáveis novas, migration criada e re
 | `Using fallback workspace` e pasta sem `.git` em uma tarefa          | Isolated workspaces desligado na instância, projeto sem política de execução ou tarefa sem `projectId` | Seções 1, 2 e 4                                                                                       |
 | A pasta gerenciada `/data/instances/default/projects/...` não existe | O Paperclip só clona o repositório na primeira tarefa que usa o workspace do projeto                   | Nenhuma: é criada automaticamente                                                                     |
 | "checked out" no histórico da tarefa sem código disponível           | No Paperclip, _checkout_ significa que o agente assumiu a tarefa, não `git checkout`                   | —                                                                                                     |
+| Agente não roda `test:e2e` nem confere migrations                    | O ambiente do Paperclip na VPS não tem MySQL nem Docker                                                | CI no GitHub Actions (seção 7)                                                                        |
 | Deploy da API executando o build do frontend                         | URLs dos repositórios trocadas no `git remote`                                                         | `git remote set-url origin <url correta>` e `git push --force-with-lease origin main homolog develop` |

@@ -11,7 +11,7 @@ Convenções deste repositório. Siga-as ao implementar qualquer tarefa.
 ## Branches
 
 - `main` = produção, `homolog` = testes humanos, `develop` = integração.
-- Trabalhe sempre em uma branch própria criada a partir de `develop` (ex.: `feature/recuperacao-de-senha`) e entregue por Pull Request para `develop`.
+- Trabalhe sempre na branch da tarefa, criada a partir de `develop`, e entregue por Pull Request para `develop`. No Paperclip, a branch já vem criada (`<ID>-<slug>`, ex.: `CEL-3-...`): use-a e não crie outra. Fora dele, crie uma (ex.: `feature/recuperacao-de-senha`).
 - **Nunca** faça commit ou push diretamente em `develop`, `homolog` ou `main`. As promoções `develop → homolog → main` são feitas por Pull Request, após os testes humanos.
 
 ## Definição de pronto
@@ -26,6 +26,14 @@ npm run build
 ```
 
 E, se houver alteração de entidades, quando `npm run typeorm -- migration:generate src/database/migrations/Check --dryrun` responder que não há mudanças pendentes.
+
+### CI
+
+O GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) roda esses mesmos comandos, com MySQL, em todo Pull Request e a cada push em `develop`, `homolog` e `main`. A conferência de migrations usa `migration:generate --check`, que falha se houver pendência.
+
+- Rode localmente tudo o que o ambiente permitir antes de abrir o PR.
+- Se algum comando não puder rodar no seu ambiente (ex.: `test:e2e` sem MySQL), diga isso no PR e use a CI como verificação: acompanhe com `gh pr checks <número> --watch`.
+- CI vermelha: leia o log da falha (`gh run view <id> --log-failed`), corrija na mesma branch e envie de novo. Um PR só está pronto para revisão com a CI verde.
 
 ## Padrões de código
 

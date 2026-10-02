@@ -1,0 +1,79 @@
+# Verificação automática da definição de pronto (ver AGENTS.md).
+# Roda em todo Pull Request e a cada push nas branches de ambiente.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, homolog, main]
+  push:
+    branches: [develop, homolog, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Lint, testes, build e migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root_ci_password
+          MYSQL_DATABASE: gestao_comercial
+          TZ: UTC
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_ci_password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    # Sem .env na CI: as variáveis vêm daqui. O usuário root permite que o e2e
+    # crie e apague o banco de testes (gestao_comercial_test).
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: root_ci_password
+      DB_DATABASE: gestao_comercial
+      DB_TEST_DATABASE: gestao_comercial_test
+      JWT_SECRET: ci-segredo-somente-para-testes-automatizados
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes unitários
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Aplicar migrations
+        run: npm run typeorm -- migration:run
+
+      - name: Conferir migrations pendentes
+        # --check falha se as entidades divergirem das migrations.
+        run: npm run typeorm -- migration:generate src/database/migrations/Check --check
+
+      - name: Testes e2e
+        run: npm run test:e2e
